@@ -10,8 +10,19 @@
             <input matInput type="password" placeholder="Bitbucket Api Password" [(ngModel)]="password" [name]="password">
         </mat-form-field>
         <a href="https://bitbucket.org/account/admin/app-passwords">get an api password</a>
-
         
+        <button mat-raised-button  (click)="getMyTeams(); " class='my-form-field-wrapper'>
+            Get My Teams
+        </button>
+        
+        <mat-form-field>
+            <mat-label>{{team?.display_name||'Team'}}</mat-label>
+            <mat-select>
+                <mat-option *ngFor="let item of getTeamsResponse?.values" [value]="item" (click)=onTeamSelected(item)>
+                    {{item.display_name}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
     </mat-card>
     <br/>
     <mat-card>

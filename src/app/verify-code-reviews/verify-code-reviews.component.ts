@@ -1,6 +1,8 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import {HttpClient, HttpHeaders} from '@angular/common/http';
 import {MatTable} from '@angular/material';
+import '../interfaces/BitBucketGetTeams';
+import {FormControl, Validators} from '@angular/forms';
 
 
 interface ICommitAnalysis {
@@ -20,8 +22,11 @@ export class VerifyCodeReviewsComponent implements OnInit {
 
     userName: string = '';
     password: string = '';
+    teamControl = new FormControl('',[Validators.required]);
+    team: BitBucketGetTeams.Value;
     searchForRepoSlug: string;
     getReposResponse: BitBucketGetRepos.RootObject;
+    getTeamsResponse: BitBucketGetTeams.RootObject;
     loadMoreReposUrl: string;
     selectedRepo: BitBucketGetRepos.Value;    
     lastHash: string = '';
@@ -37,21 +42,45 @@ export class VerifyCodeReviewsComponent implements OnInit {
         this.userName = name;
         let password = this.getCookie('password');
         this.password = password;
-
+        let team = this.getCookie('team');     
+        console.log('team',team); 
+        
+        if(team){
+          this.team=team&&JSON.parse(team);
+          this.getTeamsResponse = <any>{
+            values:[this.team]
+          }
+        }        
     }
     onLogClick() {
         console.log('UserName', this.userName);
         console.log('SearchForRepoSlug', this.searchForRepoSlug);
         console.log('getReposResponse', this.getReposResponse);
     }
-
+    async getMyTeams(){
+      const url = `https://api.bitbucket.org/2.0/teams?role=member`
+      let response = await this.makeApiCallToBitBucket<BitBucketGetTeams.RootObject>(url);  
+      while(response.next){
+          let more = await this.makeApiCallToBitBucket<BitBucketGetTeams.RootObject>(response.next); 
+          more.values.forEach(c=>response.values.push(c));
+          response.next = more.next;
+      } 
+      this.getTeamsResponse = response;
+    }
+    teamMatchesSelected(team1: BitBucketGetTeams.Value, team2: BitBucketGetTeams.Value){
+      return team1 && team2 ? team1.uuid === team2.uuid : team1 === team2;
+    }
+    onTeamSelected(team: BitBucketGetTeams.Value){
+      this.setCookie('team', JSON.stringify(team));
+      this.team = team;
+    }
     getRepos() {
         console.log('Get Repos Clicked');
         this.setCookie('userName',this.userName);
-        this.setCookie('password',this.password)
-        let url = `https://api.bitbucket.org/2.0/repositories/perfectserve?q=slug~"${this.searchForRepoSlug}"&sort=slug`;
+        this.setCookie('password',this.password);
+        let url = `https://api.bitbucket.org/2.0/repositories/${this.team.uuid}?q=slug~"${this.searchForRepoSlug}"&sort=slug`;
         if (!this.searchForRepoSlug) {
-            url = `https://api.bitbucket.org/2.0/repositories/perfectserve?sort=slug`;
+            url = `https://api.bitbucket.org/2.0/repositories/${this.team.uuid}?sort=slug`;
         }
         
         const headerDict = {
@@ -72,6 +101,7 @@ export class VerifyCodeReviewsComponent implements OnInit {
                 console.log(this.getReposResponse);
             });
     }
+
     getMoreRepos() {
         console.log('Get More Repos Clicked');
 
@@ -100,7 +130,7 @@ export class VerifyCodeReviewsComponent implements OnInit {
     }
 
     async onVerifyCodeReviewsClick(){
-        let url = `https://api.bitbucket.org/2.0/repositories/perfectserve/${this.selectedRepo.slug}/commits/?include=${this.releaseHash}&exclude=${this.lastHash}`;
+        let url = `https://api.bitbucket.org/2.0/repositories/${this.team.uuid}/${this.selectedRepo.slug}/commits/?include=${this.releaseHash}&exclude=${this.lastHash}`;
         let response = await this.makeApiCallToBitBucket<BitBucketGetCommits.RootObject>(url);  
         while(response.next){
             let more = await this.makeApiCallToBitBucket<BitBucketGetCommits.RootObject>(response.next); 
@@ -136,7 +166,7 @@ export class VerifyCodeReviewsComponent implements OnInit {
 
     async isInPullRequest(commitId:string){
         console.log(`isInPullRequest called with ${commitId}`);
-        let url = `https://api.bitbucket.org/2.0/repositories/perfectserve/${this.selectedRepo.slug}/commit/${commitId}/pullrequests`;
+        let url = `https://api.bitbucket.org/2.0/repositories/${this.team.uuid}/${this.selectedRepo.slug}/commit/${commitId}/pullrequests`;
         let result = await this.makeApiCallToBitBucket<BitBucketGetPullRequests.RootObject>(url);
         if(result.values.length > 0){
             //this.commitsInTheRelease.find(c=>c.Hash===commitId).PartOfPullRequest = `✅ In Pull Request # ${result.values.map(r=>r.id).join(',')}`
@@ -151,7 +181,7 @@ export class VerifyCodeReviewsComponent implements OnInit {
     async checkPullRequestsForIssues(pullRequestId:number){
         console.log(`checkPullRequestsForIssues called with ${pullRequestId}`);
         if(!pullRequestId){return;}
-        let url = `https://api.bitbucket.org/2.0/repositories/perfectserve/${this.selectedRepo.slug}/pullrequests/${pullRequestId}`;
+        let url = `https://api.bitbucket.org/2.0/repositories/${this.team.uuid}/${this.selectedRepo.slug}/pullrequests/${pullRequestId}`;
         let result = await this.makeApiCallToBitBucket<BitBucketGetPullRequest.RootObject>(url);
         console.log(result.reviewers.length,'Reviewers:'+result.reviewers.map(r=>r.username).join(','),'Author:'+result.author.username);
         if(result.reviewers.length < 1)
@@ -179,7 +209,7 @@ export class VerifyCodeReviewsComponent implements OnInit {
                 })
         }
         if(nonAuthorApprovers.length > 0){
-            let commitsUrl = `https://api.bitbucket.org/2.0/repositories/perfectserve/${this.selectedRepo.slug}/pullrequests/${pullRequestId}/commits`;
+            let commitsUrl = `https://api.bitbucket.org/2.0/repositories/${this.team.uuid}/${this.selectedRepo.slug}/pullrequests/${pullRequestId}/commits`;
             let commitsResult = await this.makeApiCallToBitBucket<BitBucketGetCommits.RootObject>(commitsUrl);  
             console.log('commitsResult',commitsUrl,commitsResult); 
 
