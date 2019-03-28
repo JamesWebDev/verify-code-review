@@ -170,7 +170,7 @@ export class VerifyCodeReviewsComponent implements OnInit {
         let result = await this.makeApiCallToBitBucket<BitBucketGetPullRequests.RootObject>(url);
         if(result.values.length > 0){
             //this.commitsInTheRelease.find(c=>c.Hash===commitId).PartOfPullRequest = `✅ In Pull Request # ${result.values.map(r=>r.id).join(',')}`
-            this.commitsInTheRelease.find(c=>c.Hash===commitId).PartOfPullRequest = `✅ In Pull Request # ${result.values[0].id}`;
+            this.commitsInTheRelease.find(c=>c.Hash===commitId).PartOfPullRequest = `✅#${result.values[0].id}: ${result.values[0].title}`;
             this.commitsInTheRelease.find(c=>c.Hash===commitId).PartOfPullRequestId = result.values[0].id;
         }else{
             this.commitsInTheRelease.find(c=>c.Hash===commitId).PartOfPullRequest = '❌'
