@@ -130,6 +130,7 @@ export class VerifyCodeReviewsComponent implements OnInit {
     }
 
     async onVerifyCodeReviewsClick(){
+        this.commitsInTheRelease = [];
         let url = `https://api.bitbucket.org/2.0/repositories/${this.team.uuid}/${this.selectedRepo.slug}/commits/?include=${this.releaseHash}&exclude=${this.lastHash}`;
         let response = await this.makeApiCallToBitBucket<BitBucketGetCommits.RootObject>(url);  
         while(response.next){
