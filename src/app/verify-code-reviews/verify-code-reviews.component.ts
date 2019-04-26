@@ -11,6 +11,8 @@ interface ICommitAnalysis {
     PartOfPullRequestId:number;
     Message:string;
     PullRequestIssuesFound:string;
+    Comments: string[];
+    LinkToCommit: string;
 }
 
 @Component({
@@ -32,17 +34,17 @@ export class VerifyCodeReviewsComponent implements OnInit {
     lastHash: string = '';
     releaseHash: string = '';
     commitsInTheRelease:ICommitAnalysis[] = [];
-    displayedColumns=['Hash','PartOfPullRequest','Message','PullRequestIssuesFound']
+    displayedColumns=['Hash','PartOfPullRequest','Message','PullRequestIssuesFound','Comments']
     @ViewChild(MatTable) table: MatTable<ICommitAnalysis>;
 
     constructor(public http: HttpClient) { }
 
     ngOnInit() {
-        let name = this.getCookie('userName');
+        let name = localStorage.getItem('userName');
         this.userName = name;
-        let password = this.getCookie('password');
+        let password = localStorage.getItem('password');
         this.password = password;
-        let team = this.getCookie('team');     
+        let team = localStorage.getItem('team');     
         console.log('team',team); 
         
         if(team){
@@ -50,7 +52,26 @@ export class VerifyCodeReviewsComponent implements OnInit {
           this.getTeamsResponse = <any>{
             values:[this.team]
           }
-        }        
+        } 
+        
+        let previouslySelectedRepo = localStorage.getItem("selectedRepo");
+        if(previouslySelectedRepo){
+            this.selectedRepo = JSON.parse(previouslySelectedRepo);
+        }
+
+        let previousCommitData = localStorage.getItem("commitsInTheRelease");
+        if(previousCommitData){
+            this.commitsInTheRelease = JSON.parse(previousCommitData);
+             
+        }
+        let previous = localStorage.getItem('lastHash')
+        if(previous){
+            this.lastHash = previous
+        }
+        let current = localStorage.getItem('releaseHash')
+        if(current){
+            this.releaseHash = current
+        }
     }
     onLogClick() {
         console.log('UserName', this.userName);
@@ -71,13 +92,13 @@ export class VerifyCodeReviewsComponent implements OnInit {
       return team1 && team2 ? team1.uuid === team2.uuid : team1 === team2;
     }
     onTeamSelected(team: BitBucketGetTeams.Value){
-      this.setCookie('team', JSON.stringify(team));
-      this.team = team;
+        localStorage.setItem('team', JSON.stringify(team));
+        this.team = team;
     }
     getRepos() {
         console.log('Get Repos Clicked');
-        this.setCookie('userName',this.userName);
-        this.setCookie('password',this.password);
+        localStorage.setItem('userName',this.userName);
+        localStorage.setItem('password',this.password);
         let url = `https://api.bitbucket.org/2.0/repositories/${this.team.uuid}?q=slug~"${this.searchForRepoSlug}"&sort=slug`;
         if (!this.searchForRepoSlug) {
             url = `https://api.bitbucket.org/2.0/repositories/${this.team.uuid}?sort=slug`;
@@ -127,9 +148,13 @@ export class VerifyCodeReviewsComponent implements OnInit {
     onRepoSelected(repo: BitBucketGetRepos.Value) {
         console.log(repo);
         this.selectedRepo = repo;
+        localStorage.setItem("selectedRepo",JSON.stringify(this.selectedRepo));
     }
 
     async onVerifyCodeReviewsClick(){
+        localStorage.setItem('lastHash',this.lastHash)
+        localStorage.setItem('releaseHash',this.releaseHash)
+        localStorage.removeItem('commitsInTheRelease')
         this.commitsInTheRelease = [];
         let url = `https://api.bitbucket.org/2.0/repositories/${this.team.uuid}/${this.selectedRepo.slug}/commits/?include=${this.releaseHash}&exclude=${this.lastHash}`;
         let response = await this.makeApiCallToBitBucket<BitBucketGetCommits.RootObject>(url);  
@@ -146,23 +171,32 @@ export class VerifyCodeReviewsComponent implements OnInit {
                 PartOfPullRequest:'↻',
                 PartOfPullRequestId:null,
                 Message:this.truncate(c.message,50),
-                PullRequestIssuesFound:''
+                PullRequestIssuesFound:'↻',
+                Comments:['↻'],
+                LinkToCommit:c.links.html.href,
             });
         });
         let x = [];
         this.commitsInTheRelease.forEach(r=>{
             x.push(this.isInPullRequest(r.Hash));
         });
-        Promise.all(x).then(()=>{
+        Promise.all(x).then(async ()=>{
             console.log(this.commitsInTheRelease,this.commitsInTheRelease.filter(y=>y.PartOfPullRequestId!=null).map(x=>x.PartOfPullRequestId).filter((v, i, a) => a.indexOf(v) === i));
             let pullRequests= this.commitsInTheRelease
                 .filter(y=>y.PartOfPullRequestId!=null)
                 .map(x=>x.PartOfPullRequestId)
                 .filter((v, i, a) => a.indexOf(v) === i);
             console.log(`Unique Pull Request list ${pullRequests.join(',')}`)
-            pullRequests.forEach(async p=>await this.checkPullRequestsForIssues(p));
+            pullRequests.forEach(async p=> this.checkPullRequestsForIssues(p));
+            this.loadComments();            
+            /*             
+            for(let p of pullRequests){
+                await this.checkPullRequestsForIssues(p)
+            } */
+
         });
 
+        
     }
 
     async isInPullRequest(commitId:string){
@@ -175,6 +209,7 @@ export class VerifyCodeReviewsComponent implements OnInit {
             this.commitsInTheRelease.find(c=>c.Hash===commitId).PartOfPullRequestId = result.values[0].id;
         }else{
             this.commitsInTheRelease.find(c=>c.Hash===commitId).PartOfPullRequest = '❌'
+            this.commitsInTheRelease.find(c=>c.Hash===commitId).PullRequestIssuesFound = ''
         }
         this.table.renderRows();        
     }
@@ -231,9 +266,40 @@ export class VerifyCodeReviewsComponent implements OnInit {
                 })                
             }
         }
+        this.commitsInTheRelease
+            .filter(c=>c.PartOfPullRequestId === pullRequestId)
+            .forEach((x)=>x.PullRequestIssuesFound = x.PullRequestIssuesFound.split('↻').join(''))
 
         this.table.renderRows();
+        localStorage.setItem('commitsInTheRelease',JSON.stringify(this.commitsInTheRelease));
     }    
+    async loadComments(){
+        this.commitsInTheRelease.forEach(async (c)=>{     
+            c.Comments=['↻']      
+            const url = `https://api.bitbucket.org/2.0/repositories/${this.team.uuid}/${this.selectedRepo.slug}/commit/${c.Hash}/comments?fields=values.content,values.user.display_name,values.deleted,pagelen,page,size,next`;
+            console.log(url);
+            let response = await this.makeApiCallToBitBucket<BitBucketGetComments.RootObject>(url);
+            console.log(c.Hash,response);
+            while(response.next){
+                let more = await this.makeApiCallToBitBucket<BitBucketGetComments.RootObject>(response.next); 
+                more.values.forEach(c=>response.values.push(c));
+                response.next = more.next;
+            } 
+            c.Comments=[];
+            response.values.filter(v=>!v.deleted).forEach(i=>{
+                c.Comments.push(`${i.user.display_name}: ${i.content.raw}`);
+            });
+            localStorage.setItem('commitsInTheRelease',JSON.stringify(this.commitsInTheRelease));
+        })
+    }
+    onClear(){
+        this.commitsInTheRelease = null;
+        this.lastHash =null;
+        this.releaseHash=null;
+        localStorage.removeItem('commitsInTheRelease');
+        localStorage.removeItem('lastHash');
+        localStorage.removeItem('releaseHash');
+    }
     async makeApiCallToBitBucket<T>(url:string){
         console.log('makeApiCallToBitBucket called');
 
@@ -249,7 +315,7 @@ export class VerifyCodeReviewsComponent implements OnInit {
     truncate(value:string,n:number){
         return (value.length > n) ? value.substr(0, n-1) + '…' : value;
     }
-    setCookie(name, value) {
+/*     setCookie(name, value) {
         var d = new Date;
         d.setTime(d.getTime() + 24*60*60*1000*365);
         document.cookie = name + "=" + value + ";path=/;expires=" + d.toUTCString();
@@ -257,6 +323,6 @@ export class VerifyCodeReviewsComponent implements OnInit {
     getCookie(name) {
         var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
         return v ? v[2] : null;
-    }
+    } */
 
 }

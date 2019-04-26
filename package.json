@@ -18,8 +18,8 @@
     "zone.js": "0.8.29"
   },
   "scripts": {
-    "ng": "ng",
-    "start": "ng serve",
+    "ng": "ng",    
+    "start": "ng serve --open",
     "build": "ng build",
     "test": "ng test",
     "lint": "ng lint",
