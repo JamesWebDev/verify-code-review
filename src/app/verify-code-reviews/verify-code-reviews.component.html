@@ -65,7 +65,13 @@
             Repull Comments
         </button>
         <button mat-raised-button  (click)="onClear()">clear</button>
+        <button mat-raised-button  (click)="onParseStoryNumbers()">Parse VersionOne Story Numbers</button>
     </mat-card>
+    <ul *ngIf="storyNumbers?.length > 0">
+        <li *ngFor="let story of storyNumbers">
+            {{ story }}
+          </li>    
+    </ul>
 
     <table *ngIf="commitsInTheRelease?.length > 0" mat-table [dataSource]="commitsInTheRelease" class='myTable'>
         <ng-container matColumnDef="Hash">

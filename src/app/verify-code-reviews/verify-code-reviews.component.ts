@@ -24,6 +24,7 @@ export class VerifyCodeReviewsComponent implements OnInit {
 
     userName: string = '';
     password: string = '';
+    storyNumbers:string[];
     teamControl = new FormControl('',[Validators.required]);
     team: BitBucketGetTeams.Value;
     searchForRepoSlug: string;
@@ -310,6 +311,21 @@ export class VerifyCodeReviewsComponent implements OnInit {
             headers: new HttpHeaders(headerDict)
         };
         return this.http.get<T>(url,requestOptions).toPromise();
+    }
+
+    onParseStoryNumbers(){
+        let storyNumbers=[];
+        function onlyUnique(value, index, self) { 
+            return self.indexOf(value) === index;
+        }
+        this.commitsInTheRelease.forEach(c=>{
+            const regex = /[sS]-[0-9]+/g;
+            let matches = c.Message.match(regex);
+            matches&&matches.forEach(m=>storyNumbers.push(m.toUpperCase()));
+        });
+        storyNumbers=storyNumbers.filter( onlyUnique ).sort()
+        
+        this.storyNumbers = storyNumbers;
     }
 
     truncate(value:string,n:number){
