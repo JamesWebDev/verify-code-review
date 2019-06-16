@@ -319,9 +319,11 @@ export class VerifyCodeReviewsComponent implements OnInit {
             return self.indexOf(value) === index;
         }
         this.commitsInTheRelease.forEach(c=>{
-            const regex = /[sS]-[0-9]+/g;
-            let matches = c.Message.match(regex);
+            const regex = /[sS][- _][0-9]+/g;
+            let matches = c.Message.match(regex);            
             matches&&matches.forEach(m=>storyNumbers.push(m.toUpperCase()));
+            let pullRequestMatches = c.PartOfPullRequest.match(regex);
+            pullRequestMatches&&pullRequestMatches.forEach(m=>storyNumbers.push(m.toUpperCase()));
         });
         storyNumbers=storyNumbers.filter( onlyUnique ).sort()
         
@@ -331,14 +333,5 @@ export class VerifyCodeReviewsComponent implements OnInit {
     truncate(value:string,n:number){
         return (value.length > n) ? value.substr(0, n-1) + '…' : value;
     }
-/*     setCookie(name, value) {
-        var d = new Date;
-        d.setTime(d.getTime() + 24*60*60*1000*365);
-        document.cookie = name + "=" + value + ";path=/;expires=" + d.toUTCString();
-    }
-    getCookie(name) {
-        var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
-        return v ? v[2] : null;
-    } */
 
 }
