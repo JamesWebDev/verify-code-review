@@ -3,7 +3,13 @@
 <mat-card>
     <mat-card>
         <mat-form-field class='my-form-field-wrapper'>
-            <input matInput type="text" placeholder="Bitbucket UserName" [(ngModel)]="userName" [name]='userName'>
+            <input 
+            matInput 
+            type="text" 
+            placeholder="Bitbucket UserName (Not Email)" 
+            [(ngModel)]="userName" 
+            pattern="^((?!@).)*$"
+            [name]='userName'>
         </mat-form-field>
 
         <mat-form-field class='my-form-field-wrapper'>
