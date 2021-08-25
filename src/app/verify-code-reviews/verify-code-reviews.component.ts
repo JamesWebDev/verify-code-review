@@ -319,7 +319,7 @@ export class VerifyCodeReviewsComponent implements OnInit {
             return self.indexOf(value) === index;
         }
         this.commitsInTheRelease.forEach(c=>{
-            const regex = /[sS][- _][0-9]+/g;
+            const regex = /[sS][oO][- _][0-9]+/g;
             let matches = c.Message.match(regex);            
             matches&&matches.forEach(m=>storyNumbers.push(m.toUpperCase()));
             let pullRequestMatches = c.PartOfPullRequest.match(regex);
